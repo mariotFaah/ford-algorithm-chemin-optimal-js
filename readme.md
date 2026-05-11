@@ -3,7 +3,7 @@
 #### 1- Premierement:
 Vous faites un double clique pour creer un sommet, le sommet est numerotees par ordre et generer automatiquement
 ![premier etape](./sary/step1.png)
-Une vous avez satisfais de votre sommet , vous selectionnez votre sommet vers le sommet qu'il redirige et vous pouvez entrer la valeur de l'arc.
+Une fois vous avez satisfais de votre sommet , vous selectionnez votre sommet vers le sommet qu'il redirige et vous pouvez entrer la valeur de l'arc.
 
 
 #### 2- Deuxiement:

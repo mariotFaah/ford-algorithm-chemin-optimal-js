@@ -30,7 +30,7 @@ while(lambda_i==Infinity) {
         while(i>j && lambda_j - lam > poids(i,j)){
             if(lambda_j - lambda_i > poids(i,j)) {
                 lambda_j = lambda_i + poids(i,j)
-            }
+            } 
         }
     }
     // s'arreter lorsqu'aucun lambda_i ne peut plus etre modifiee
