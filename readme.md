@@ -1,4 +1,5 @@
 ### Voici le guide l'utilisation 
+![all](./sary/all.png)
 #### 1- Premierement:
 Vous faites un double clique pour creer un sommet, le sommet est numerotees par ordre et generer automatiquement
 ![premier etape](./sary/step1.png)
