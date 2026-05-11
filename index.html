@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Graph Designer - Min/Max</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; background: #ecf0f1; }
+        #sidebar { width: 350px; background: #2c3e50; color: white; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.2); z-index: 10; overflow-y: auto; }
+        #cy { flex: 1; background: #fdfdfd; cursor: crosshair; }
+        .card { background: #34495e; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #455a64; }
+        h2, h3 { margin-top: 0; color: #3498db; }
+        label { display: block; margin: 10px 0 5px; font-size: 0.9em; }
+        input { width: 100%; padding: 8px; border-radius: 4px; border: none; box-sizing: border-box; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        button { padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; transition: 0.3s; }
+        .btn-min { background: #27ae60; color: white; }
+        .btn-max { background: #e67e22; color: white; }
+        .btn-reset { background: #e74c3c; color: white; width: 100%; margin-top: 10px; }
+        button:hover { opacity: 0.8; transform: translateY(-2px); }
+        .instructions { font-size: 0.85em; color: #bdc3c7; line-height: 1.4; }
+        #log { margin-top: 15px; font-family: monospace; font-size: 0.9em; color: #2ecc71; }
+    </style>
+</head>
+<body>
+
+<div id="sidebar">
+    <h2>Graph Builder</h2>
+    <p class="instructions">
+        🖱️ <b>Double-clic</b> : Créer un sommet<br>
+        🔗 <b>Clic A puis B</b> : Créer un arc (poids)<br>
+        🖐️ <b>Drag</b> : Déplacer un sommet
+    </p>
+
+    <div class="card">
+        <h3>Calcul</h3>
+        <label>Sommet de départ (ex: x1)</label>
+        <input type="text" id="startNode" placeholder="Source">
+        <label>Sommet d'arrivée (ex: x3)</label>
+        <input type="text" id="endNode" placeholder="Destination">
+        
+        <div class="btn-group">
+            <button class="btn-min" onclick="lancerCalcul('min')">MIN (Bellman)</button>
+            <button class="btn-max" onclick="lancerCalcul('max')">MAX (Backtrack)</button>
+        </div>
+    </div>
+
+    <div id="log"></div>
+    <button class="btn-reset" onclick="window.location.reload()">Réinitialiser tout</button>
+</div>
+
+<div id="cy"></div>
+
+<script>
+let sourceNode = null;
+let nodeCount = 1;
+
+// Initialisation de Cytoscape
+const cy = cytoscape({
+    container: document.getElementById('cy'),
+    style: [
+        { selector: 'node', style: { 'label': 'data(id)', 'background-color': '#3498db', 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center', 'width': 40, 'height': 40 } },
+        { selector: 'edge', style: { 'label': 'data(poids)', 'width': 3, 'line-color': '#bdc3c7', 'target-arrow-color': '#bdc3c7', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'font-size': '12px', 'color': '#2c3e50', 'text-background-opacity': 1, 'text-background-color': '#ffffff', 'text-background-padding': '3px' } },
+        { selector: '.highlighted', style: { 'line-color': '#e74c3c', 'target-arrow-color': '#e74c3c', 'width': 6, 'background-color': '#e74c3c' } }
+    ]
+});
+
+// ÉVÉNEMENTS INTERACTIFS
+// 1. Créer un noeud sur double clic
+cy.on('dblclick', (e) => {
+    if (e.target === cy) {
+        cy.add({
+            group: 'nodes',
+            data: { id: 'x' + nodeCount },
+            position: e.position
+        });
+        nodeCount++;
+    }
+});
+
+// 2. Créer un arc (clic sur source puis cible)
+cy.on('tap', 'node', (e) => {
+    const node = e.target;
+    if (!sourceNode) {
+        sourceNode = node;
+        node.style('background-color', '#e74c3c'); // Feedback visuel
+    } else {
+        if (sourceNode.id() !== node.id()) {
+            const poids = prompt("Entrez le poids de l'arc :", "1");
+            if (poids !== null) {
+                cy.add({
+                    group: 'edges',
+                    data: { 
+                        id: sourceNode.id() + node.id(), 
+                        source: sourceNode.id(), 
+                        target: node.id(), 
+                        poids: parseInt(poids) || 0 
+                    }
+                });
+            }
+        }
+        sourceNode.style('background-color', '#3498db');
+        sourceNode = null;
+    }
+});
+
+// TRANSFORMER CYTOSCAPE EN OBJET GRAPHE POUR TES ALGORITHMES
+function exporterGraphe() {
+    const json = {};
+    cy.nodes().forEach(n => {
+        json[n.id()] = { voisins: [] };
+    });
+    cy.edges().forEach(e => {
+        json[e.data('source')].voisins.push({ 
+            nom: e.data('target'), 
+            poids: e.data('poids') 
+        });
+    });
+    return json;
+}
+
+// TES ALGORITHMES (ADAPTÉS)
+function lancerCalcul(mode) {
+    const start = document.getElementById('startNode').value;
+    const end = document.getElementById('endNode').value;
+    const graphe = exporterGraphe();
+
+    if (!graphe[start] || !graphe[end]) {
+        alert("Les sommets de départ ou d'arrivée n'existent pas !");
+        return;
+    }
+
+    cy.elements().removeClass('highlighted');
+    let res;
+
+    if (mode === 'min') {
+        res = algoMin(graphe, start, end);
+    } else {
+        res = algoMax(graphe, start, end);
+    }
+
+    if (res.succes && res.chemin.length > 0) {
+        document.getElementById('log').innerHTML = `RÉSULTAT :<br>Distance: ${res.distance}<br>Chemin: ${res.chemin.join(' -> ')}`;
+        // Coloration visuelle
+        for (let i = 0; i < res.chemin.length - 1; i++) {
+            cy.getElementById(res.chemin[i]).addClass('highlighted');
+            cy.edges(`[source="${res.chemin[i]}"][target="${res.chemin[i+1]}"]`).addClass('highlighted');
+        }
+        cy.getElementById(res.chemin[res.chemin.length-1]).addClass('highlighted');
+    } else {
+        alert("Aucun chemin trouvé !");
+    }
+}
+
+function algoMin(g, dep, arr) {
+    const etats = {};
+    for (let s in g) etats[s] = { lambda: s === dep ? 0 : Infinity, parent: null };
+    let modif = true;
+    while (modif) {
+        modif = false;
+        for (let s in g) {
+            if (etats[s].lambda === Infinity) continue;
+            for (let v of g[s].voisins) {
+                if (etats[v.nom].lambda > etats[s].lambda + v.poids) {
+                    etats[v.nom].lambda = etats[s].lambda + v.poids;
+                    etats[v.nom].parent = s;
+                    modif = true;
+                }
+            }
+        }
+    }
+    const path = []; let curr = arr;
+    while (curr) { path.unshift(curr); curr = etats[curr].parent; }
+    return { distance: etats[arr].lambda, chemin: path[0]===dep?path:[], succes: path[0]===dep };
+}
+
+function algoMax(g, dep, arr) {
+    let bestP = []; let maxD = -Infinity;
+    const find = (curr, d, p, v) => {
+        if (curr === arr) { if (d > maxD) { maxD = d; bestP = [...p]; } return; }
+        for (let nxt of g[curr].voisins) {
+            if (!v.has(nxt.nom)) {
+                v.add(nxt.nom); p.push(nxt.nom);
+                find(nxt.nom, d + nxt.poids, p, v);
+                p.pop(); v.delete(nxt.nom);
+            }
+        }
+    };
+    find(dep, 0, [dep], new Set([dep]));
+    return { distance: maxD, chemin: bestP, succes: bestP.length > 0 };
+}
+</script>
+</body>
+</html>
